@@ -1,11 +1,10 @@
 # CI for MailReserve. See AGENTS.md "CI" for the rules around this file.
 #
-# engine  - Linux. This repo's own branches run on the self-hosted ephemeral Docker runner
-#           (label in the CI_RUNNER repo variable); fork PRs always run on ubuntu-latest so
-#           strangers' code never executes on the owner's Mac. Deleting CI_RUNNER sends every
-#           run to ubuntu-latest (escape hatch if the local fleet is down).
-# app     - macOS, GitHub-hosted (free for public repos). Builds and tests everything that needs
-#           macOS: the Keychain adapter now, the SwiftUI app from Milestone 2.
+# All jobs run on GitHub-hosted runners (free and unlimited for public repos).
+# engine  - Linux, inside the pinned swift:6.4.0-noble container, with GreenMail as a service
+#           container for the integration tests.
+# app     - macOS. Builds and tests everything that needs macOS: the Keychain adapter now,
+#           the SwiftUI app from Milestone 2.
 # ci-gate - the single required status check in the branch rulesets.
 name: CI
 
@@ -25,25 +24,54 @@ permissions:
 jobs:
   engine:
     name: engine (Linux)
-    runs-on: ${{ (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository) && vars.CI_RUNNER || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 30
+    container: swift:6.4.0-noble
+    services:
+      # Fake IMAP/SMTP server for integration tests: IMAP 3143, IMAPS 3993, SMTP 3025.
+      # One fake user, test@localhost / test-password. Never a real account.
+      greenmail:
+        image: greenmail/standalone:2.1.14
+        env:
+          GREENMAIL_OPTS: >-
+            -Dgreenmail.setup.test.all
+            -Dgreenmail.hostname=0.0.0.0
+            -Dgreenmail.users=test:test-password@localhost
+            -Dgreenmail.users.login=email
     env:
-      MAILRESERVE_IMAP_TEST_HOST: 127.0.0.1
+      MAILRESERVE_IMAP_TEST_HOST: greenmail
       MAILRESERVE_REQUIRE_INTEGRATION: "1"
     steps:
+      # git before checkout so actions/checkout makes a real clone; jq for the coverage gate.
+      - name: Install tools
+        run: apt-get update && apt-get install -y --no-install-recommends git jq
+
       - uses: actions/checkout@v4
 
       - name: Toolchain
-        run: |
-          swift --version
-          java -version
-          jq --version
+        run: swift --version
 
       - name: Build
         run: swift build --build-tests
 
-      - name: Start GreenMail
-        run: scripts/ci/start-greenmail.sh
+      # The service container starts before the steps, but GreenMail may still be booting.
+      # Wait until a real IMAP LOGIN succeeds, not just until the port opens.
+      - name: Wait for GreenMail
+        shell: bash
+        run: |
+          for _ in $(seq 1 60); do
+            if (
+              exec 3<>/dev/tcp/greenmail/3143
+              printf 'a1 LOGIN test@localhost test-password\r\na2 LOGOUT\r\n' >&3
+              timeout 5 grep -m1 -q '^a1 OK' <&3
+            ) 2>/dev/null; then
+              echo "GreenMail is ready"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "GreenMail did not become ready" >&2
+          exit 1
 
       # Unit and integration tests in one run so coverage counts both.
       # MAILRESERVE_REQUIRE_INTEGRATION=1 makes integration tests fail instead of skipping.
@@ -52,10 +80,6 @@ jobs:
 
       - name: Coverage gate (MailReserveKit >= 80%)
         run: scripts/ci/check-coverage.sh 80
-
-      - name: GreenMail log
-        if: ${{ failure() }}
-        run: cat .ci-cache/greenmail.log || true
 
   app:
     name: app (macOS)
@@ -69,8 +93,8 @@ jobs:
           xcodebuild -version
           swift --version
 
-      # Integration tests skip here (no GreenMail on the hosted macOS runner); they are
-      # enforced in the engine job.
+      # Integration tests skip here (no GreenMail on the macOS runner, which has no Docker);
+      # they are enforced in the engine job.
       - name: Build and test package
         run: swift test
 
@@ -81,7 +105,7 @@ jobs:
     name: CI gate
     if: ${{ always() }}
     needs: [engine, app]
-    runs-on: ${{ (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository) && vars.CI_RUNNER || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - name: Require every job to succeed
