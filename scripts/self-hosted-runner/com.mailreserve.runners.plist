@@ -39,11 +39,12 @@
   <string>__REPO_DIR__</string>
 
   <!-- launchd starts with a minimal PATH; docker, gh and shasum live outside it.
-       Homebrew is /opt/homebrew on Apple Silicon. -->
+       Docker Desktop's CLI lives inside the app bundle (it only symlinks it into ~/.docker/bin,
+       which launchd never sees). Homebrew is /opt/homebrew on Apple Silicon. -->
   <key>EnvironmentVariables</key>
   <dict>
     <key>PATH</key>
-    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <string>/Applications/Docker.app/Contents/Resources/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
     <key>CI_RUNNERS</key>
     <string>2</string>
   </dict>
