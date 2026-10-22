@@ -140,20 +140,17 @@ scripts/ci/check-coverage.sh 80  # after: swift test --enable-code-coverage
 ## CI (GitHub Actions)
 
 Workflow: [`.github/workflows/ci.yml`](.github/workflows/ci.yml), on PRs and pushes to `develop`
-and `main`.
+and `main`. All jobs run on GitHub-hosted runners (free and unlimited for public repos). Do not
+add self-hosted runners: on a public repo they would run strangers' fork PRs on the owner's machine.
 
 | Job | Runner | What it does |
 |---|---|---|
-| `engine` | Self-hosted `mailreserve-ci` (ephemeral Docker, Linux arm64) for this repo's own branches; `ubuntu-latest` for fork PRs | Build, unit tests with coverage gate, GreenMail integration tests |
-| `app` | GitHub-hosted `macos-latest` | macOS build and tests (Keychain adapter, app from M2) |
-| `ci-gate` | Same routing as `engine` | Fails unless every job succeeded. **The only required check.** |
+| `engine` | `ubuntu-latest`, inside the pinned `swift:6.4.0-noble` container, with GreenMail as a `services:` container | Build, unit + integration tests, coverage gate |
+| `app` | `macos-latest` | macOS build and tests (Keychain adapter, app from M2) |
+| `ci-gate` | `ubuntu-latest` | Fails unless every job succeeded. **The only required check.** |
 
-- Runner routing reads the repo variable `CI_RUNNER`. Deleting it (`gh variable delete CI_RUNNER`)
-  sends new runs to GitHub-hosted runners; this is the escape hatch if the local fleet is down.
-- Fork PRs never run on the self-hosted runner (it executes on the owner's Mac). Do not change
-  the routing expression without preserving that.
-- The runner fleet is defined in `scripts/self-hosted-runner/` (see its README). Changing runner
-  files is a CI change: run the full pipeline before merging.
+- Bump the Swift container and GreenMail image versions deliberately, in their own PR.
+- Outside contributors' fork PRs wait for owner approval before workflows run (repo setting).
 - **Never merge red.** Retry only with evidence: code or assertion failures need a code change.
   One unchanged-SHA rerun is allowed for an unexplained infrastructure failure. If it repeats, stop
   and investigate. Record the run ID, attempt and SHA in the PR and the task note.

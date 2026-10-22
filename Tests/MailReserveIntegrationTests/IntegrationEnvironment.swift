@@ -19,7 +19,8 @@ enum IntegrationEnvironment {
     /// GreenMail's plain-text IMAP port in its "test" setup.
     static var plainPort: UInt16 { UInt16(env["MAILRESERVE_IMAP_TEST_PORT"] ?? "") ?? 3143 }
 
-    /// Fake GreenMail user created by scripts/ci/start-greenmail.sh. Never a real account.
+    /// Fake GreenMail user (set up by the CI service container and scripts/test-integration.sh).
+    /// Never a real account.
     static var user: String { env["MAILRESERVE_IMAP_TEST_USER"] ?? "test@localhost" }
     static var password: String { env["MAILRESERVE_IMAP_TEST_PASSWORD"] ?? "test-password" }
 }

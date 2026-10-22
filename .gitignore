@@ -48,8 +48,7 @@ Packages/
 .env.*
 *.local.xcconfig
 
-# CI helper downloads (GreenMail jar, coverage reports)
-/.ci-cache/
+# Coverage reports
 coverage/
 
 # --- Editors ----------------------------------------------------------------
