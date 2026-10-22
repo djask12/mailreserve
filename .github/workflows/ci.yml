@@ -1,0 +1,94 @@
+# CI for MailReserve. See AGENTS.md "CI" for the rules around this file.
+#
+# engine  - Linux. This repo's own branches run on the self-hosted ephemeral Docker runner
+#           (label in the CI_RUNNER repo variable); fork PRs always run on ubuntu-latest so
+#           strangers' code never executes on the owner's Mac. Deleting CI_RUNNER sends every
+#           run to ubuntu-latest (escape hatch if the local fleet is down).
+# app     - macOS, GitHub-hosted (free for public repos). Builds and tests everything that needs
+#           macOS: the Keychain adapter now, the SwiftUI app from Milestone 2.
+# ci-gate - the single required status check in the branch rulesets.
+name: CI
+
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop, main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  engine:
+    name: engine (Linux)
+    runs-on: ${{ (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository) && vars.CI_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 30
+    env:
+      MAILRESERVE_IMAP_TEST_HOST: 127.0.0.1
+      MAILRESERVE_REQUIRE_INTEGRATION: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: |
+          swift --version
+          java -version
+          jq --version
+
+      - name: Build
+        run: swift build --build-tests
+
+      - name: Start GreenMail
+        run: scripts/ci/start-greenmail.sh
+
+      # Unit and integration tests in one run so coverage counts both.
+      # MAILRESERVE_REQUIRE_INTEGRATION=1 makes integration tests fail instead of skipping.
+      - name: Test (unit + integration, with coverage)
+        run: swift test --enable-code-coverage
+
+      - name: Coverage gate (MailReserveKit >= 80%)
+        run: scripts/ci/check-coverage.sh 80
+
+      - name: GreenMail log
+        if: ${{ failure() }}
+        run: cat .ci-cache/greenmail.log || true
+
+  app:
+    name: app (macOS)
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: |
+          xcodebuild -version
+          swift --version
+
+      # Integration tests skip here (no GreenMail on the hosted macOS runner); they are
+      # enforced in the engine job.
+      - name: Build and test package
+        run: swift test
+
+      - name: Release build
+        run: swift build -c release
+
+  ci-gate:
+    name: CI gate
+    if: ${{ always() }}
+    needs: [engine, app]
+    runs-on: ${{ (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository) && vars.CI_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    steps:
+      - name: Require every job to succeed
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "job results: $RESULTS"
+          for result in $RESULTS; do
+            [ "$result" = "success" ] || { echo "a required job did not succeed" >&2; exit 1; }
+          done

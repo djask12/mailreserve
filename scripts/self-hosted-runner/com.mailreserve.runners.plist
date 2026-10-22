@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  launchd agent for supervise.sh: keeps the MailReserve runner fleet alive across logout and
+  reboot (a terminal `while true` loop dies with the session that started it).
+
+  Install (replace __REPO_DIR__ with the absolute path to this checkout):
+
+    sed "s|__REPO_DIR__|$PWD|g" scripts/self-hosted-runner/com.mailreserve.runners.plist \
+      > ~/Library/LaunchAgents/com.mailreserve.runners.plist
+    launchctl load  ~/Library/LaunchAgents/com.mailreserve.runners.plist
+    launchctl list | grep mailreserve
+    tail -f /tmp/mailreserve-runners.log
+
+  Stop (also how you take the fleet down deliberately):
+
+    launchctl unload ~/Library/LaunchAgents/com.mailreserve.runners.plist
+
+  NOTE: unloading KILLS RUNNING JOBS (the runner containers are children of the supervisor).
+  Check nothing is in flight first:
+
+    gh api repos/djask12/mailreserve/actions/runners --jq '.runners[]|select(.busy)|.name'
+
+  Unloading does not move queued jobs to GitHub-hosted runners: `runs-on` is resolved when a run
+  is created, so `gh variable delete CI_RUNNER` only affects runs created after it.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.mailreserve.runners</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>__REPO_DIR__/scripts/self-hosted-runner/supervise.sh</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>__REPO_DIR__</string>
+
+  <!-- launchd starts with a minimal PATH; docker, gh and shasum live outside it.
+       Docker Desktop's CLI lives inside the app bundle (it only symlinks it into ~/.docker/bin,
+       which launchd never sees). Homebrew is /opt/homebrew on Apple Silicon. -->
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/Applications/Docker.app/Contents/Resources/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>CI_RUNNERS</key>
+    <string>2</string>
+  </dict>
+
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+
+  <key>StandardOutPath</key>
+  <string>/tmp/mailreserve-runners.log</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/mailreserve-runners.log</string>
+</dict>
+</plist>

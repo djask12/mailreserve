@@ -1,0 +1,59 @@
+# --- Agent workspace (local only, never committed) -------------------------
+# Plans and live task notes are shared between Claude Code and Codex on this
+# machine through the filesystem. See AGENTS.md "Plans" and "Task notes".
+/plans/*
+!/plans/README.md
+/notes/*
+!/notes/_TEMPLATE.md
+
+# Claude Code per-user settings (the shared .claude/settings.json is committed)
+.claude/settings.local.json
+
+# --- macOS ----------------------------------------------------------------
+.DS_Store
+._*
+.AppleDouble
+.LSOverride
+.Spotlight-V100
+.Trashes
+.fseventsd
+
+# --- Xcode ----------------------------------------------------------------
+xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
+*.xccheckout
+*.moved-aside
+DerivedData/
+build/
+*.xcresult
+timeline.xctimeline
+playground.xcworkspace
+
+# --- Swift Package Manager -------------------------------------------------
+# Package.resolved stays committed: this is an app, builds must be reproducible.
+.build/
+.swiftpm/
+Packages/
+
+# --- Local runs, archives and secrets --------------------------------------
+# Never commit real mail, indexes or credentials. Test fixture .eml files live
+# under Tests/ and ARE committed.
+/LocalArchive/
+/spike-output/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+.env
+.env.*
+*.local.xcconfig
+
+# CI helper downloads (GreenMail jar, coverage reports)
+/.ci-cache/
+coverage/
+
+# --- Editors ----------------------------------------------------------------
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
