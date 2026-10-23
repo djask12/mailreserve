@@ -101,6 +101,10 @@ jobs:
       - name: Release build
         run: swift build -c release
 
+      # M0 spike (separate package, exempt from tests): keep it compiling while it is in use.
+      - name: Build Spike
+        run: swift build --package-path Spike
+
   ci-gate:
     name: CI gate
     if: ${{ always() }}
