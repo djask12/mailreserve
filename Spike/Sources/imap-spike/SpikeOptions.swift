@@ -1,6 +1,6 @@
 // SpikeOptions.swift — parses the spike's command line and resolves provider presets.
 //
-//   imap-spike <gmail|yahoo|host[:port]> <email> [--folder INBOX] [--count 100]
+//   imap-spike <gmail|yahoo|yahoo-export|host[:port]> <email> [--folder INBOX] [--count 100]
 //              [--output spike-output] [--list-only]
 //   Local GreenMail testing only (refused for any other host):
 //              [--plaintext] [--test-password <password>]
@@ -20,7 +20,7 @@ struct SpikeOptions {
     var testPassword: String?
 
     static let usage = """
-        usage: imap-spike <gmail|yahoo|host[:port]> <email> [--folder INBOX] [--count 100]
+        usage: imap-spike <gmail|yahoo|yahoo-export|host[:port]> <email> [--folder INBOX] [--count 100]
                           [--output spike-output] [--list-only]
                localhost only: [--plaintext] [--test-password <password>]
         """
@@ -29,12 +29,17 @@ struct SpikeOptions {
     static let presets: [String: (host: String, port: Int)] = [
         "gmail": ("imap.gmail.com", 993),
         "yahoo": ("imap.mail.yahoo.com", 993),
+        // Yahoo's bulk-export server; reportedly allows up to 100,000 messages per folder instead of
+        // 10,000, but may be heavily throttled.
+        "yahoo-export": ("export.imap.mail.yahoo.com", 993),
     ]
 
     var isLocalhost: Bool { ["localhost", "127.0.0.1", "::1"].contains(host) }
 
     /// True for Gmail and Yahoo, whose app passwords have a known shape.
     var isProviderPreset: Bool { Self.presets.values.contains { $0.host == host } }
+
+    var isYahoo: Bool { host.hasSuffix("mail.yahoo.com") }
 
     init(arguments: [String]) throws {
         var positional: [String] = []

@@ -102,14 +102,16 @@ struct ImapSpike {
         }
         print("\(options.folder): \(report.exists ?? 0) messages, UIDVALIDITY \(report.uidValidity.map(String.init) ?? "?")")
 
-        var uids: [UID] = []
-        try await session.run("UID SEARCH", .uidSearch(key: .all)) { response in
-            if case .untagged(.mailboxData(.search(let ids, _))) = response {
-                uids.append(contentsOf: ids.map { UID($0) })
-            }
+        // The newest N messages are the last N sequence numbers (EXISTS-N+1 ... EXISTS), so no SEARCH
+        // is needed. `UID SEARCH ALL` returns every UID on one line, which breaks swift-nio-imap's
+        // fixed 8 KB line limit once a folder holds a few thousand messages (Yahoo, 10,000: 2026-10-23).
+        let exists = report.exists ?? 0
+        let first = max(1, exists - options.count + 1)
+        let total = exists >= first ? exists - first + 1 : 0
+        if options.isYahoo && exists == 10_000 {
+            report.notes.append("EXISTS is exactly 10,000: Yahoo's IMAP server shows only the newest 10,000 messages per folder; older mail is not reachable here.")
         }
-        let newest = Array(uids.sorted().suffix(options.count))
-        print("Downloading the newest \(newest.count) of \(uids.count) messages...")
+        print("Downloading the newest \(total) of \(exists) messages...")
 
         let isGmail = report.capabilities.contains("X-GM-EXT-1")
         var attributes: [FetchAttribute] = [.uid, .rfc822Size, .bodySection(peek: true, .complete, nil)]
@@ -120,15 +122,14 @@ struct ImapSpike {
             .appendingPathComponent(FolderLine.safeDirectoryName(options.folder))
         let sink = try MessageSink(directory: directory)
 
-        // `newest` is sorted and contiguous among the folder's existing UIDs, so each batch can be
-        // sent as one range (lo:hi); the server only returns UIDs that exist.
-        for start in stride(from: 0, to: newest.count, by: batchSize) {
-            let batch = newest[start..<min(start + batchSize, newest.count)]
-            guard let low = batch.first, let high = batch.last else { continue }
-            try await session.run("UID FETCH", .uidFetch(.range(MessageIdentifierRange(low...high)), attributes, [])) { response in
+        // Sequence numbers are stable for this session: EXAMINE is read-only, so nothing is expunged.
+        for low in stride(from: first, through: exists, by: batchSize) {
+            let high = min(low + batchSize - 1, exists)
+            let range = MessageIdentifierRange(SequenceNumber(rawValue: UInt32(low))...SequenceNumber(rawValue: UInt32(high)))
+            try await session.run("FETCH", .fetch(.range(range), attributes, [])) { response in
                 if case .fetch(let event) = response { try sink.handle(event) }
             }
-            print("  \(sink.saved.count)/\(newest.count)")
+            print("  \(sink.saved.count)/\(total)")
         }
 
         report.directory = directory
