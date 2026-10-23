@@ -33,6 +33,8 @@ struct SpikeReport {
     var messages: [SavedMessage] = []
     var directory: URL?
     var seconds: Double = 0
+    /// Observations worth flagging for M1 (provider limits and the like).
+    var notes: [String] = []
 
     var totalBytes: Int { messages.reduce(0) { $0 + $1.bytesWritten } }
     var sizeMismatches: [SavedMessage] { messages.filter { $0.bytesWritten != $0.bytesExpected } }
@@ -46,6 +48,7 @@ struct SpikeReport {
             lines.append("Size mismatches: \(sizeMismatches.count); messages without UID: \(missingUID.count)")
             if let directory { lines.append("Files: \(directory.path)") }
         }
+        lines += notes.map { "NOTE: \($0)" }
         return lines.joined(separator: "\n")
     }
 
@@ -58,6 +61,7 @@ struct SpikeReport {
         text.append("Server ID: \(serverID ?? "(not sent or not supported)")")
         text.append("Capabilities (\(capabilities.count)): \(capabilities.joined(separator: " "))")
         text.append("Gmail extensions (X-GM-EXT-1): \(capabilities.contains("X-GM-EXT-1"))")
+        text += notes.map { "NOTE: \($0)" }
         text.append("")
         text.append("Folders (\(folders.count)):")
         text += folders.map { "  \($0.name)  \($0.attributes.joined(separator: " "))" }

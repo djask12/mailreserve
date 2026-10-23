@@ -53,6 +53,20 @@ Options:
 
 A server other than Gmail or Yahoo can be given as `host` or `host:port` (TLS only).
 
+### Yahoo's 10,000-message limit
+
+Yahoo's regular IMAP server (`imap.mail.yahoo.com`) shows only the **newest 10,000 messages in each
+folder**, so older mail in a bigger folder can't be reached by any IMAP app. When a Yahoo folder
+reports exactly 10,000 messages, the spike adds a `NOTE` to its output and report.
+
+Yahoo's bulk-export server reportedly allows up to 100,000 messages per folder, but may be slow or
+throttled. Try it with the `yahoo-export` preset, which uses the same Keychain password:
+
+```bash
+swift run --package-path Spike imap-spike yahoo-export you@yahoo.com --list-only
+swift run --package-path Spike imap-spike yahoo-export you@yahoo.com
+```
+
 ## 4. The gate
 
 M0 passes when, for **both** accounts:
