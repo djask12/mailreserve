@@ -26,6 +26,9 @@ struct ImapSpike {
 
     static func run(_ options: SpikeOptions) async throws {
         let password = try options.testPassword ?? KeychainPassword.read(account: options.email)
+        if options.isProviderPreset, let warning = KeychainPassword.appPasswordWarning(password, account: options.email) {
+            FileHandle.standardError.write(Data("\(warning)\n\n".utf8))
+        }
         var report = SpikeReport(options: options)
         let clock = ContinuousClock()
         let started = clock.now

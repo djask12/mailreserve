@@ -33,6 +33,9 @@ struct SpikeOptions {
 
     var isLocalhost: Bool { ["localhost", "127.0.0.1", "::1"].contains(host) }
 
+    /// True for Gmail and Yahoo, whose app passwords have a known shape.
+    var isProviderPreset: Bool { Self.presets.values.contains { $0.host == host } }
+
     init(arguments: [String]) throws {
         var positional: [String] = []
         var folder: String?, count: Int?, output: String?, testPassword: String?

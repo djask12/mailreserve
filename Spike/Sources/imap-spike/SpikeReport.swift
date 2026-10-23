@@ -12,7 +12,7 @@ struct FolderLine {
     init(info: MailboxInfo) {
         let separator = info.path.pathSeparator.map(String.init) ?? "/"
         name = info.path.displayStringComponents().joined(separator: separator)
-        attributes = info.attributes.map { String(describing: $0) }
+        attributes = info.attributes.map { String($0) }
     }
 
     /// A folder name made safe as a single directory name ("[Gmail]/Sent Mail" -> "[Gmail]_Sent Mail").

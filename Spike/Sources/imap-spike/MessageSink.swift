@@ -45,7 +45,7 @@ final class MessageSink {
         case .simpleAttribute(.gmailMessageID(let id)):
             current.gmailMessageID = id
         case .simpleAttribute(.gmailLabels(let labels)):
-            current.gmailLabels = labels.map { String(describing: $0) }
+            current.gmailLabels = labels.map { $0.makeDisplayString() }
         case .simpleAttribute:
             break
         case .streamingBegin(_, let byteCount):

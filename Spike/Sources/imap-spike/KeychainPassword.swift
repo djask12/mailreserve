@@ -27,4 +27,20 @@ enum KeychainPassword {
         // Google shows app passwords in groups of four ("abcd efgh ..."); the spaces are not part of it.
         return password.filter { !$0.isWhitespace }
     }
+
+    /// Gmail and Yahoo app passwords are exactly 16 lowercase letters. Returns a warning when the
+    /// stored password doesn't look like one: the usual cause of "Invalid credentials" is pasting the
+    /// normal account password, or invisible characters copied along with the app password.
+    /// Describes only the length and character types, never the password itself.
+    static func appPasswordWarning(_ password: String, account: String) -> String? {
+        let isAppPassword = password.count == 16 && password.allSatisfy { ("a"..."z").contains($0) }
+        guard !isAppPassword else { return nil }
+        let kinds = password.allSatisfy(\.isASCII) ? "" : ", including non-text characters (often copied invisibly)"
+        return """
+            warning: the Keychain password for \(account) is \(password.count) characters\(kinds), but Gmail and \
+            Yahoo app passwords are 16 lowercase letters. The server will probably reject it. Re-store it by \
+            typing the 16 letters:
+              security add-generic-password -U -s \(service) -a \(account) -w
+            """
+    }
 }
