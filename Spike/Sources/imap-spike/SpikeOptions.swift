@@ -1,7 +1,7 @@
 // SpikeOptions.swift — parses the spike's command line and resolves provider presets.
 //
 //   imap-spike <gmail|yahoo|yahoo-export|host[:port]> <email> [--folder INBOX] [--count 100]
-//              [--output ~/MailReserve-spike] [--list-only] [--survey]
+//              [--output spike-output] [--list-only] [--survey]
 //   Local GreenMail testing only (refused for any other host):
 //              [--plaintext] [--test-password <password>]
 
@@ -13,9 +13,10 @@ struct SpikeOptions {
     var email: String
     var folder = "INBOX"
     var count = 100
-    /// Outside the repository by default: real mail never belongs in the working tree. Any folder
-    /// works, including a mounted NAS share under /Volumes.
-    var output = "~/MailReserve-spike"
+    /// Relative to where the spike runs: from the repository root this is `spike-output/`, which is
+    /// gitignored so real mail is never committed. `--output` takes any folder, including a mounted
+    /// NAS share under /Volumes.
+    var output = "spike-output"
     var listOnly = false
     /// Open every folder read-only and record its message count; downloads nothing.
     var survey = false
@@ -25,7 +26,7 @@ struct SpikeOptions {
 
     static let usage = """
         usage: imap-spike <gmail|yahoo|yahoo-export|host[:port]> <email> [--folder INBOX] [--count 100]
-                          [--output ~/MailReserve-spike] [--list-only] [--survey]
+                          [--output spike-output] [--list-only] [--survey]
                localhost only: [--plaintext] [--test-password <password>]
         """
 

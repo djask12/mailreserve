@@ -9,13 +9,13 @@ For one account, it:
 2. lists every folder;
 3. opens one folder **read-only** (`EXAMINE`), so read/unread flags never change;
 4. downloads the newest N messages with `BODY.PEEK[]`, streaming each one to
-   `~/MailReserve-spike/<email>/<folder>/<uid>.eml`;
-5. writes `~/MailReserve-spike/<email>/report.txt`, covering capabilities, folders, UIDVALIDITY,
+   `spike-output/<email>/<folder>/<uid>.eml`;
+5. writes `spike-output/<email>/report.txt`, covering capabilities, folders, UIDVALIDITY,
    sizes, Gmail message IDs and labels, and timing.
 
-Output goes to `~/MailReserve-spike`, outside the repository, because it is your real mail. Use
-`--output` to put it anywhere else, including a mounted NAS share (for example
-`--output /Volumes/Mail/MailReserve-spike`).
+Run it from the repository root: output goes to `spike-output/`, which is gitignored because it
+holds your real mail, so never commit or share it. Use `--output` to put it anywhere else, including
+a mounted NAS share (for example `--output /Volumes/Mail/MailReserve-spike`).
 
 ## 1. Create app passwords
 
@@ -52,7 +52,7 @@ Options:
 | `--folder NAME` | `INBOX` | Folder to download from, named as in the report's folder list (e.g. `[Gmail]/Sent Mail`) |
 | `--list-only` | off | Only log in and list folders |
 | `--survey` | off | Open every folder read-only and report how many messages the server shows in each; downloads nothing |
-| `--output DIR` | `~/MailReserve-spike` | Where files and reports go (any folder, including a NAS share under `/Volumes`) |
+| `--output DIR` | `spike-output` | Where files and reports go (any folder, including a NAS share under `/Volumes`) |
 
 A server other than Gmail or Yahoo can be given as `host` or `host:port` (TLS only).
 
@@ -88,7 +88,7 @@ later") is recorded without stopping the rest.
 M0 passes when, for **both** accounts:
 
 - [ ] the spike finishes with `Size mismatches: 0` and `messages without UID: 0`;
-- [ ] in Finder, opening `~/MailReserve-spike/<email>/INBOX/`, selecting all the `.eml` files and pressing
+- [ ] in Finder, opening `spike-output/<email>/INBOX/`, selecting all the `.eml` files and pressing
       ⌘O opens them in Apple Mail;
 - [ ] spot-checked messages show the right sender, subject, date and body, including HTML mail,
       non-English text and attachments (open or Quick Look at least one attachment);
