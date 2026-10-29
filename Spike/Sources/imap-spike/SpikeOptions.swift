@@ -1,7 +1,7 @@
 // SpikeOptions.swift — parses the spike's command line and resolves provider presets.
 //
 //   imap-spike <gmail|yahoo|yahoo-export|host[:port]> <email> [--folder INBOX] [--count 100]
-//              [--output spike-output] [--list-only]
+//              [--output spike-output] [--list-only] [--survey]
 //   Local GreenMail testing only (refused for any other host):
 //              [--plaintext] [--test-password <password>]
 
@@ -13,15 +13,20 @@ struct SpikeOptions {
     var email: String
     var folder = "INBOX"
     var count = 100
+    /// Relative to where the spike runs: from the repository root this is `spike-output/`, which is
+    /// gitignored so real mail is never committed. `--output` takes any folder, including a mounted
+    /// NAS share under /Volumes.
     var output = "spike-output"
     var listOnly = false
+    /// Open every folder read-only and record its message count; downloads nothing.
+    var survey = false
     var useTLS = true
     /// Only for localhost GreenMail runs; real accounts always read the Keychain.
     var testPassword: String?
 
     static let usage = """
         usage: imap-spike <gmail|yahoo|yahoo-export|host[:port]> <email> [--folder INBOX] [--count 100]
-                          [--output spike-output] [--list-only]
+                          [--output spike-output] [--list-only] [--survey]
                localhost only: [--plaintext] [--test-password <password>]
         """
 
@@ -29,8 +34,8 @@ struct SpikeOptions {
     static let presets: [String: (host: String, port: Int)] = [
         "gmail": ("imap.gmail.com", 993),
         "yahoo": ("imap.mail.yahoo.com", 993),
-        // Yahoo's bulk-export server; reportedly allows up to 100,000 messages per folder instead of
-        // 10,000, but may be heavily throttled.
+        // Yahoo's documented server for downloading mail (help.yahoo.com/kb/SLN28681.html): folders up
+        // to ~100,000 messages instead of the regular server's 10,000; large downloads can take days.
         "yahoo-export": ("export.imap.mail.yahoo.com", 993),
     ]
 
@@ -44,7 +49,7 @@ struct SpikeOptions {
     init(arguments: [String]) throws {
         var positional: [String] = []
         var folder: String?, count: Int?, output: String?, testPassword: String?
-        var listOnly = false, plaintext = false
+        var listOnly = false, plaintext = false, survey = false
 
         var iterator = arguments.makeIterator()
         while let argument = iterator.next() {
@@ -59,6 +64,7 @@ struct SpikeOptions {
                 count = parsed
             case "--output": output = try value()
             case "--list-only": listOnly = true
+            case "--survey": survey = true
             case "--plaintext": plaintext = true
             case "--test-password": testPassword = try value()
             case "-h", "--help": throw SpikeError.usage(nil)
@@ -80,8 +86,9 @@ struct SpikeOptions {
         email = positional[1]
         if let folder { self.folder = folder }
         if let count { self.count = count }
-        if let output { self.output = output }
+        self.output = NSString(string: output ?? self.output).expandingTildeInPath
         self.listOnly = listOnly
+        self.survey = survey
         self.useTLS = !plaintext
         self.testPassword = testPassword
 

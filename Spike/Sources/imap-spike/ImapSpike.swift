@@ -67,7 +67,9 @@ struct ImapSpike {
             report.folders = folders.map { FolderLine(info: $0) }
             print("Found \(folders.count) folders")
 
-            if !options.listOnly {
+            if options.survey {
+                try await survey(folders: folders, session: session, report: &report)
+            } else if !options.listOnly {
                 try await backUp(options: options, folders: folders, session: session, report: &report)
             }
 
@@ -78,6 +80,30 @@ struct ImapSpike {
         let reportURL = try report.write()
         print(report.summary)
         print("Report: \(reportURL.path)")
+    }
+
+    /// Opens every selectable folder read-only and records how many messages the server exposes.
+    /// Compare the totals with Yahoo's web interface: a folder showing exactly 10,000 (regular server)
+    /// is hiding older mail. One folder failing ("try again later") doesn't stop the survey.
+    static func survey(folders: [MailboxInfo], session: IMAPSession, report: inout SpikeReport) async throws {
+        let selectable = folders.filter { !$0.attributes.contains(.noSelect) }
+        print("Surveying \(selectable.count) folders (read-only, nothing downloaded)...")
+        for folder in selectable {
+            let name = FolderLine(info: folder).name
+            var exists: Int?
+            do {
+                try await session.run("EXAMINE", .examine(folder.path.name)) { response in
+                    if case .untagged(.mailboxData(.exists(let count))) = response { exists = count }
+                }
+                report.survey.append(SurveyLine(folder: name, exists: exists, error: nil))
+                print("  \(name): \(exists.map(String.init) ?? "?")")
+            } catch let SpikeError.commandFailed(_, response) {
+                report.survey.append(SurveyLine(folder: name, exists: nil, error: response))
+                print("  \(name): failed (\(response))")
+            }
+            // Be gentle with Yahoo: one folder per second.
+            try await Task.sleep(for: .seconds(1))
+        }
     }
 
     static func backUp(options: SpikeOptions, folders: [MailboxInfo], session: IMAPSession, report: inout SpikeReport) async throws {
