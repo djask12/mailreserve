@@ -21,6 +21,21 @@ struct FolderLine {
     }
 }
 
+/// One folder's result in --survey mode.
+struct SurveyLine {
+    var folder: String
+    var exists: Int?
+    var error: String?
+
+    /// Flags what matters for a complete backup.
+    var flag: String {
+        guard let exists else { return "FAILED: \(error ?? "unknown")" }
+        if exists == 10_000 { return "exactly 10,000: likely capped (regular Yahoo server hides older mail)" }
+        if exists >= 100_000 { return "100,000+: Yahoo says folders this big may not download fully; split it" }
+        return "ok"
+    }
+}
+
 struct SpikeReport {
     let options: SpikeOptions
     var greeting = ""
@@ -35,6 +50,7 @@ struct SpikeReport {
     var seconds: Double = 0
     /// Observations worth flagging for M1 (provider limits and the like).
     var notes: [String] = []
+    var survey: [SurveyLine] = []
 
     var totalBytes: Int { messages.reduce(0) { $0 + $1.bytesWritten } }
     var sizeMismatches: [SavedMessage] { messages.filter { $0.bytesWritten != $0.bytesExpected } }
@@ -43,12 +59,17 @@ struct SpikeReport {
     var summary: String {
         var lines = ["", "== \(options.email) (\(options.host)) =="]
         lines.append("Folders: \(folders.count)")
-        if !options.listOnly {
+        if !options.listOnly && !options.survey {
             lines.append("Downloaded: \(messages.count) messages, \(totalBytes / 1024) KB in \(String(format: "%.1f", seconds))s")
             lines.append("Size mismatches: \(sizeMismatches.count); messages without UID: \(missingUID.count)")
             if let directory { lines.append("Files: \(directory.path)") }
         }
         lines += notes.map { "NOTE: \($0)" }
+        if options.survey {
+            let total = survey.compactMap(\.exists).reduce(0, +)
+            lines.append("Survey: \(survey.count) folders, \(total) messages visible in total")
+            lines += survey.filter { $0.flag != "ok" }.map { "  CHECK \($0.folder): \($0.flag)" }
+        }
         return lines.joined(separator: "\n")
     }
 
@@ -65,7 +86,13 @@ struct SpikeReport {
         text.append("")
         text.append("Folders (\(folders.count)):")
         text += folders.map { "  \($0.name)  \($0.attributes.joined(separator: " "))" }
-        if !options.listOnly {
+        if options.survey {
+            text.append("")
+            text.append("Survey (messages visible per folder):")
+            text += survey.map { "  \($0.folder)  \($0.exists.map(String.init) ?? "-")  \($0.flag)" }
+            text.append("  TOTAL  \(survey.compactMap(\.exists).reduce(0, +))")
+        }
+        if !options.listOnly && !options.survey {
             text.append("")
             text.append("Folder examined: \(options.folder)")
             text.append("EXISTS: \(exists.map(String.init) ?? "?")  UIDVALIDITY: \(uidValidity.map(String.init) ?? "?")  UIDNEXT: \(uidNext.map(String.init) ?? "?")")

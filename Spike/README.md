@@ -49,7 +49,8 @@ Options:
 | `--count N` | `100` | How many of the newest messages to download |
 | `--folder NAME` | `INBOX` | Folder to download from, named as in the report's folder list (e.g. `[Gmail]/Sent Mail`) |
 | `--list-only` | off | Only log in and list folders |
-| `--output DIR` | `spike-output` | Where files and reports go |
+| `--survey` | off | Open every folder read-only and report how many messages the server shows in each; downloads nothing |
+| `--output DIR` | `~/MailReserve-spike` | Where files and reports go (any folder, including a NAS share under `/Volumes`) |
 
 A server other than Gmail or Yahoo can be given as `host` or `host:port` (TLS only).
 
@@ -64,8 +65,21 @@ throttled. Try it with the `yahoo-export` preset, which uses the same Keychain p
 
 ```bash
 swift run --package-path Spike imap-spike yahoo-export you@yahoo.com --list-only
-swift run --package-path Spike imap-spike yahoo-export you@yahoo.com
+swift run --package-path Spike imap-spike yahoo-export you@yahoo.com --survey
 ```
+
+### Checking that every message is reachable
+
+`--survey` lists how many messages the server exposes in every folder, including subfolders, and
+adds them up. Compare each folder's count with Yahoo's web interface:
+
+- the counts match: that folder is fully reachable;
+- exactly 10,000 on the regular server: Yahoo is hiding the older messages in that folder;
+- 100,000 or more: Yahoo says folders this big may not download fully, so split it into subfolders.
+
+Each subfolder is its own IMAP folder with its own count, so a parent's count doesn't include its
+subfolders. The survey pauses one second between folders, and a folder that fails ("try again
+later") is recorded without stopping the rest.
 
 ## 4. The gate
 
